@@ -1,0 +1,8 @@
+-- CreateTable
+CREATE TABLE "Sound" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    CONSTRAINT "Sound_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE NO ACTION ON UPDATE CASCADE
+);
