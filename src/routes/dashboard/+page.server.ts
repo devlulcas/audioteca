@@ -1,6 +1,5 @@
 import { db } from '$lib/server/database/prisma';
 import { fail, redirect } from '@sveltejs/kit';
-import { generateId } from 'lucia';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -15,14 +14,15 @@ export const actions = {
 	saveAudio: async (event) => {
 		const author = event.locals.user;
 
-		if (!author)
+		if (!author) {
 			return fail(401, {
 				message: 'Unauthorized'
 			});
+		}
 
 		const formData = await event.request.formData();
 		const name = formData.get('name');
-		const file = formData.get('file');
+		const key = formData.get('key');
 		const authorId = author.id;
 
 		if (typeof name !== 'string' || name.length < 3 || name.length > 255) {
@@ -31,24 +31,23 @@ export const actions = {
 			});
 		}
 
-		if (!(file instanceof File)) {
+		if (typeof key !== 'string') {
 			return fail(400, {
-				message: 'Invalid file'
+				message: 'Invalid key'
 			});
 		}
-
-		const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + generateId(6);
 
 		try {
 			await db.sound.create({
 				data: {
 					name: name,
-					url: slug,
+					url: key,
 					userId: authorId
 				}
 			});
 		} catch (error) {
-			console.log("Error on file upload: ", String(error))
+			console.log('Error on file upload: ', String(error));
+
 			return fail(500, {
 				message: 'Failed to save audio'
 			});

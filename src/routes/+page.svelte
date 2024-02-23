@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { PageServerData } from './$types';
+	import type { PageServerData } from './$types';
 
 	export let data: PageServerData;
 </script>
@@ -9,7 +9,10 @@
 	<button>Sign out</button>
 </form>
 
-<h1>Audios</h1>
+<div>
+	<h1>Audios</h1>
+	<a href="/dashboard">Adicionar novo conteúdo</a>
+</div>
 
 <ul>
 	{#each data.audios as audio}
