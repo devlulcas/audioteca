@@ -1,21 +1,38 @@
 import { db } from '$lib/server/database/prisma';
-import { fail, redirect } from '@sveltejs/kit';
+import { actionFail } from '$lib/server/errors/action-fail';
+import { createPresignedURL } from '$lib/server/file-upload/create-presigned-url';
+import { redirect } from '@sveltejs/kit';
+import { generateId } from 'lucia';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
 	if (!event.locals.user) redirect(302, '/login');
 
+	const key = generateId(6) + event.locals.user.id;
+
+	const presignedUrl = await createPresignedURL(key);
+
+	const myUploads = db.sound.findMany({
+		where: {
+			userId: event.locals.user.id
+		}
+	});
+
 	return {
-		username: event.locals.user.username
+		username: event.locals.user.username,
+		presignedUrl,
+		key,
+		lazy: {
+			myUploads
+		}
 	};
 };
 
 export const actions = {
-	saveAudio: async (event) => {
-		const author = event.locals.user;
-
-		if (!author) {
-			return fail(401, {
+	default: async (event) => {
+		if (!event.locals.user) {
+			return actionFail(401, {
+				as: 'warning',
 				message: 'Unauthorized'
 			});
 		}
@@ -23,16 +40,17 @@ export const actions = {
 		const formData = await event.request.formData();
 		const name = formData.get('name');
 		const key = formData.get('key');
-		const authorId = author.id;
 
 		if (typeof name !== 'string' || name.length < 3 || name.length > 255) {
-			return fail(400, {
+			return actionFail(400, {
+				as: 'warning',
 				message: 'Invalid name'
 			});
 		}
 
 		if (typeof key !== 'string') {
-			return fail(400, {
+			return actionFail(400, {
+				as: 'warning',
 				message: 'Invalid key'
 			});
 		}
@@ -42,15 +60,18 @@ export const actions = {
 				data: {
 					name: name,
 					url: key,
-					userId: authorId
+					userId: event.locals.user.id
 				}
 			});
 		} catch (error) {
-			console.log('Error on file upload: ', String(error));
+			console.error('Error on file upload: ', String(error));
 
-			return fail(500, {
+			return actionFail(500, {
+				as: 'error',
 				message: 'Failed to save audio'
 			});
 		}
+
+		redirect(302, '/dashboard');
 	}
 } satisfies Actions;

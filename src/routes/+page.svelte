@@ -1,9 +1,13 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import type { PageServerData } from './$types';
+	import FailMessage from '$lib/components/fail-message.svelte';
+	import type { ActionData, PageServerData } from './$types';
 
 	export let data: PageServerData;
+	export let form: ActionData
 </script>
+
+<FailMessage body={form} />
 
 <form method="post" use:enhance action="/?/signOut">
 	<button>Sign out</button>

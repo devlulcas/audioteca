@@ -1,7 +1,8 @@
 import { lucia } from '$lib/server/auth/lucia';
-import { fail, redirect } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/database/prisma';
+import { actionFail } from '$lib/server/errors/action-fail';
+import { redirect } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
 	if (!event.locals.user) redirect(302, '/login');
@@ -21,7 +22,7 @@ export const load: PageServerLoad = async (event) => {
 			}
 		}
 	});
-	
+
 	return {
 		currentUser: event.locals.user,
 		audios: audios
@@ -31,17 +32,28 @@ export const load: PageServerLoad = async (event) => {
 export const actions = {
 	signOut: async (event) => {
 		if (!event.locals.session) {
-			return fail(401);
+			return actionFail(401, {
+				as: 'error',
+				message: 'You are not signed in'
+			});
 		}
 
-		await lucia.invalidateSession(event.locals.session.id);
+		try {
+			await lucia.invalidateSession(event.locals.session.id);
+		} catch (error) {
+			return actionFail(500, {
+				as: 'error',
+				message: error instanceof Error ? error.message : 'An error occurred'
+			});
+		}
+
 		const sessionCookie = lucia.createBlankSessionCookie();
-		
-    event.cookies.set(sessionCookie.name, sessionCookie.value, {
+
+		event.cookies.set(sessionCookie.name, sessionCookie.value, {
 			path: '.',
 			...sessionCookie.attributes
 		});
-		
-    redirect(302, '/login');
+
+		redirect(302, '/login');
 	}
 } satisfies Actions;

@@ -1,109 +1,69 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import type { ActionData } from './$types';
+	import FailMessage from '$lib/components/fail-message.svelte';
+	import InputFile from '$lib/components/input-file.svelte';
+	import type { ActionData, PageServerData } from './$types';
 
-	export let form: ActionData;
+	let { data, form } = $props<{ form: ActionData; data: PageServerData }>();
 
-	const getPresignedURL = async (file: File) => {
-		const fileName = file.name;
-
-		const formData = new FormData();
-
-		formData.append('name', fileName);
-
-		const response = await fetch('/api/create-presigned-url', {
-			method: 'POST',
-			body: formData
-		});
-
-        
-		const json = await response.json();
-        
-		const url = json.url;
-		const key = json.key;
-
-		if (typeof url !== 'string' || typeof key !== 'string') {
-			throw new Error('Invalid response from server');
-		}
-
-		return { url, key };
-	};
-
-	const uploadFile = async (url: string, file: File) => {
-		const response = await fetch(url, {
-			method: 'PUT',
-			body: file
-		});
-
-		if (!response.ok) {
-			throw new Error('Failed to upload file');
-		}
-
-		const json = await response.json();
-
-		if (typeof json.key !== 'string') {
-			throw new Error('Invalid response from server');
-		}
-
-		return json.key;
-	};
-
-	const saveSound = async (key: string, name: string) => {
-		const formData = new FormData();
-
-		formData.append('key', key);
-		formData.append('name', name);
-
-		const response = await fetch('?/addSound', {
-			method: 'POST',
-			body: formData
-		});
-
-		if (!response.ok) {
-			throw new Error('Failed to save sound');
-		}
-	};
+	let acceptedFiles = $state<File[]>([]);
 </script>
 
 <h1>Add sound</h1>
 
-<form
-	method="post"
-    enctype="multipart/form-data"   
-	use:enhance={async ({ formData }) => {
-		const file = formData.get('file');
-		const name = formData.get('name');
+<form method="post" enctype="multipart/form-data" use:enhance>
+	<FailMessage body={form} />
 
-		if (!(file instanceof File)) {
-			throw new Error('Invalid file');
-		}
+	<input type="hidden" name="key" value={data.key} />
 
-		if (typeof name !== 'string') {
-			throw new Error('Invalid name');
-		}
+	<div>
+		<label for="name">Name</label>
+		<input type="text" id="name" name="name" required />
+	</div>
 
-		try {
-			const presignedUrl = await getPresignedURL(file);
-			const fileKey = await uploadFile(presignedUrl.url, file);
-			await saveSound(fileKey, name);
+	<div>
+		<label for="file">File</label>
+		<InputFile id="file" name="file" accept="audio/*" acceptedFiles={acceptedFiles} required>
+			{#snippet dragActiveSlot()}
+				<p>Drop the file here...</p>
+			{/snippet}
 
-			alert('Sound added');
-		} catch (error) {
-			console.error(error);
+			<p>Drag and drop a file here, or click to select files</p>
+		</InputFile>
 
-			if (error instanceof Error) {
-				alert(error.message);
-			}
-
-			alert('Failed to add sound');
-		}
-	}}
->
-	<label for="name">Name</label>
-	<input type="text" id="name" name="name" required />
-
-	<label for="file">File</label>
-	<input type="file" id="file" name="file" required accept="audio/*" />
+		{#if acceptedFiles.length > 0}
+			<ul>
+				{#each acceptedFiles as file}
+					<li>
+						{file.name}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</div>
 
 	<button type="submit">Add</button>
 </form>
+
+<hr />
+
+{#await data.lazy.myUploads}
+	<p>Loading...</p>
+{:then myUploads}
+	{#if myUploads.length > 0}
+		<h2>My uploads</h2>
+		<ul>
+			{#each myUploads as upload}
+				<li>
+					{upload.name}
+				</li>
+			{/each}
+		</ul>
+	{/if}
+	<p>No uploads yet</p>
+{:catch error}
+	{@const errorMessage = error instanceof Error ? error.message : error}
+	<strong aria-live="assertive">
+		{errorMessage}
+	</strong>
+{/await}
